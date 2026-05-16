@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+data/*.cbm
+data/*.pkl
+data/er_dataset_ankara.csv
+data/forecast_next_days.csv

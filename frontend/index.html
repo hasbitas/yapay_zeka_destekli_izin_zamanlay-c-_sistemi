@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YAP-İS | Yapay Zeka Destekli İzin Planlayıcısı</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- LOGIN -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-card">
+      <div class="login-logo">
+        <h1>YAP-İS</h1>
+        <p>Yapay Zeka Destekli İzin Planlayıcısı</p>
+      </div>
+      <form class="login-form" id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="loginId">👤 Doktor ID</label>
+          <input type="text" id="loginId" placeholder="Örn: AY001" required autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">🔒 Şifre</label>
+          <input type="password" id="loginPassword" placeholder="Şifreniz" required />
+        </div>
+        <div class="login-error" id="loginError"></div>
+        <button type="submit" class="login-button">Giriş Yap</button>
+      </form>
+      <p class="login-hint">Demo: AY001 / ayse123 • başhekim / admin (yönetim paneli)</p>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div class="app-container" id="appContainer" style="display:none;">
+    <nav class="navbar">
+      <div class="navbar-left">
+        <div class="navbar-logo">
+          <h1>YAP-İS</h1>
+          <span>Predictive Healthcare</span>
+        </div>
+      </div>
+      <div class="navbar-right">
+        <div class="header-badge" id="dateBadge">📅 —</div>
+        <div class="header-badge" style="background:var(--green-bg);color:#065f46;">⚡ Sistem Aktif</div>
+        <button class="dark-mode-toggle" onclick="toggleDarkMode()">🌙</button>
+        <button class="logout-button" onclick="handleLogout()">🚪 Çıkış</button>
+      </div>
+    </nav>
+
+    <main class="main-content">
+      <header class="header">
+        <div class="header-left">
+          <h2>Hoş Geldiniz, <span id="doctorName">Doktor</span> 👋</h2>
+          <p>AI; hava durumunu, tatilleri ve hastalık trendlerini birleştirerek yarının yoğunluğunu öngörüyor.</p>
+        </div>
+        <button class="ai-button-inline" id="aiButton" onclick="runPredictiveScenario()">
+          🤖 Predictive Scenario Çalıştır (Salı -5°C)
+        </button>
+      </header>
+
+      <!-- Weather-driven alert banner — initially hidden -->
+      <div class="alert-banner red" id="weatherAlert" style="display:none;">
+        <div class="alert-icon">🌨️</div>
+        <div id="weatherAlertBody"></div>
+      </div>
+
+      <section class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon">🏥</div>
+          <div class="kpi-label">AI Tahmini — Beklenen ER Hastası</div>
+          <div class="kpi-value" id="kpiPatientValue">—</div>
+          <div class="kpi-sub" id="kpiPatientSub">Senaryoyu çalıştırın</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">🌡️</div>
+          <div class="kpi-label">Hava Durumu (Senaryo Günü)</div>
+          <div class="kpi-value" id="kpiWeatherValue">—</div>
+          <div class="kpi-sub" id="kpiWeatherSub">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">🚨</div>
+          <div class="kpi-label">Sistem Aksiyonu</div>
+          <div class="kpi-value" id="kpiStatusValue" style="font-size:1.4rem;color:var(--green);">⏳ Beklemede</div>
+          <div class="kpi-sub" id="kpiStatusSub">İzin durumu burada güncellenecek</div>
+        </div>
+      </section>
+
+      <div class="chart-card">
+        <h3>📈 7 Günlük ER Yoğunluk Tahmini</h3>
+        <div class="chart-bars" id="chartBars"></div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-header-row">
+          <h3>📋 Güncel İzin / Nöbet Çizelgesi</h3>
+          <div class="leave-counter" id="scheduleBadge">— kayıt</div>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr><th>Personel</th><th>Tarih</th><th>Tür</th><th>Durum</th></tr>
+            </thead>
+            <tbody id="scheduleTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

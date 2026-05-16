@@ -1,0 +1,16 @@
+feature,importance
+tavg,19.76
+dayofweek,11.16
+year,6.61
+dow_sin,6.00
+dow_cos,5.88
+prcp,5.77
+holiday_type,4.53
+tmax,3.54
+is_monday,3.48
+er_patients_lag_7,2.49
+snow,2.25
+snow_day,2.23
+er_patients_lag_14,2.15
+is_weekend,2.13
+tmin,1.37
