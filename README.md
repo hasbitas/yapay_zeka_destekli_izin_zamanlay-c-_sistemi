@@ -1,0 +1,1 @@
+# yapay_zeka_destekli_izin_zamanlay-c-_sistemi
