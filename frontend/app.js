@@ -644,32 +644,81 @@ function trDateToIso(s) {
   return yr + '-' + String(mon).padStart(2,'0') + '-' + String(day).padStart(2,'0');
 }
 
+// Hangi ISO haftasındayız? (yıl-haftano)
+function isoWeekKey(isoDate) {
+  const d = new Date(isoDate + 'T00:00:00');
+  const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = tmp.getUTCDay() || 7;
+  tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((tmp - yearStart) / 86400000) + 1) / 7);
+  return tmp.getUTCFullYear() + '-W' + String(week).padStart(2, '0');
+}
+
+let lastScenarioWeek = null;
+
+// İzin önerileri tablosunu SİL ve forecast'tan baştan inşa et.
+// Her gün = bir satır; haftalık 2 limit, hafta değişince sıfırlanır.
 function overlayLeaveTableWithForecast(weekly) {
-  if (!currentDoctor) return;
-  const byDate = {};
-  weekly.forEach(function (d) { byDate[d.date] = d; });
+  if (!weekly || !weekly.length) return;
+  const tbody = document.getElementById('leaveTableBody');
+  if (!tbody) return;
 
-  const rows = document.querySelectorAll('#leaveTableBody tr');
-  rows.forEach(function (row) {
-    const idx = row.getAttribute('data-index');
-    if (idx === null) return;
-    const rec = currentDoctor.leaveRecommendations[parseInt(idx, 10)];
-    if (!rec) return;
-    const iso = trDateToIso(rec.date);
-    const fc = iso ? byDate[iso] : null;
-    if (!fc) return;  // forecast aralığı dışında — dokunma
+  // Hafta değişimi tespiti → seçimleri ve sayacı sıfırla
+  const wkKey = isoWeekKey(weekly[0].date);
+  if (wkKey !== lastScenarioWeek) {
+    pendingSelections = {};
+    confirmedCount = 0;
+    isConfirmed = false;
+    lastScenarioWeek = wkKey;
+    document.getElementById('confirmBar').style.display = 'none';
+  }
 
-    // 3. hücredeki badge'i güncelle
-    const cells = row.querySelectorAll('td');
-    if (cells.length < 3) return;
+  // currentDoctor.leaveRecommendations'ı forecast ile YENİDEN üret
+  // (gün/intensity/status'un seçilen tarihle uyumlu olması için)
+  if (currentDoctor) {
+    currentDoctor.leaveRecommendations = weekly.map(function (fc) {
+      return {
+        date: fc.date_tr || fc.date,
+        day: fc.weekday,
+        intensity: fc.intensity,
+        status: fc.status,
+        iso: fc.date,
+        predicted: fc.predicted,
+        tavg: fc.tavg,
+      };
+    });
+  }
+
+  // Tabloyu baştan çiz
+  let html = '';
+  weekly.forEach(function (fc, idx) {
     const badgeClass = fc.status === 'red' ? 'badge-red'
                      : fc.status === 'yellow' ? 'badge-yellow' : 'badge-green';
-    cells[2].innerHTML = '<span class="badge ' + badgeClass + '" title="AI: ' +
-                         fc.predicted + ' hasta • ' + fc.tavg + '°C">' +
-                         fc.intensity + '</span>';
-
-    // Modeli güncel tut (sonraki render'larda doğru kalsın)
-    rec.intensity = fc.intensity;
-    rec.status = fc.status;
+    const selectedMark = fc.is_selected
+      ? ' style="font-weight:700;color:var(--primary-700);"' : '';
+    html +=
+      '<tr data-index="' + idx + '">' +
+        '<td' + selectedMark + '>' + (fc.date_tr || fc.date) +
+          (fc.is_selected ? ' <span style="font-size:0.7rem;color:var(--primary-500);">●</span>' : '') +
+        '</td>' +
+        '<td>' + fc.weekday + '</td>' +
+        '<td><span class="badge ' + badgeClass + '" title="AI: ' +
+          fc.predicted + ' hasta • ' + fc.tavg + '°C">' + fc.intensity + '</span></td>' +
+        '<td><div class="action-buttons">' +
+          '<button class="btn-sm btn-approve" onclick="selectLeave(' + idx + ', \'approve\', this)">✓ Onayla</button>' +
+          '<button class="btn-sm btn-reject" onclick="selectLeave(' + idx + ', \'reject\', this)">✕ Reddet</button>' +
+        '</div></td>' +
+      '</tr>';
   });
+  tbody.innerHTML = html;
+
+  // Sayaç label'ını güncelle (hafta + kullanım)
+  updateLeaveCounter();
+  const counter = document.getElementById('leaveCounter');
+  if (counter) {
+    counter.innerHTML = '🎫 Bu Hafta (' + wkKey + ') Kullanılan İzin: ' +
+      '<strong><span id="leaveUsed">' + countPendingApprovals() + '</span>/' +
+      WEEKLY_LEAVE_LIMIT + '</strong>';
+  }
 }
