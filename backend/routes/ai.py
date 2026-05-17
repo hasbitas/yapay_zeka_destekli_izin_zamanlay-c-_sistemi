@@ -12,20 +12,18 @@ Akış:
 """
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
-import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from services.mock_data import leave_requests_db, schedule_db
 from services.weather import get_weather_forecast
+from services.ai_predictor import predict as ai_predict_local
 
 router = APIRouter()
 
-AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://127.0.0.1:9000")
 BASELINE_PATIENTS = 330.0   # eğitim setindeki ortalamaya yakın
 SURGE_THRESHOLD = 0.20      # %20 ve üzeri artış → operasyonel müdahale
 
@@ -67,50 +65,35 @@ def _classify(ratio: float) -> tuple[str, str]:
     return "Çok Düşük", "green"
 
 
-async def _ai_predict(client: httpx.AsyncClient, date: str, weather: dict) -> dict:
-    r = await client.post(f"{AI_SERVICE_URL}/predict",
-                          json={"date": date, "weather": weather})
-    r.raise_for_status()
-    return r.json()
-
-
 @router.post("/predict-and-reschedule")
-async def predict_and_reschedule(payload: PredictRequest):
+def predict_and_reschedule(payload: PredictRequest):
     """Hackathon ana akışı — hava + AI + iş mantığı + 7 günlük forecast."""
-    # 1) Hava durumu (seçilen gün)
     weather = get_weather_forecast(payload.city, payload.date)
+    ai_result = ai_predict_local(payload.date, weather)
 
-    # 2) AI servisinden tahmin + 7 günlük forecast (seçilen gün dahil)
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            ai_result = await _ai_predict(client, payload.date, weather)
-
-            weekly_forecast = []
-            start = datetime.strptime(payload.date, "%Y-%m-%d")
-            for i in range(7):
-                d = start + timedelta(days=i)
-                ds = d.strftime("%Y-%m-%d")
-                w = get_weather_forecast(payload.city, ds)
-                pr = (ai_result if i == 0
-                      else await _ai_predict(client, ds, w))
-                pred = float(pr["predicted_er_patients"])
-                ratio = pred / CAPACITY
-                intensity, status = _classify(ratio)
-                weekly_forecast.append({
-                    "date": ds,
-                    "date_tr": d.strftime("%d.%m.%Y"),
-                    "weekday": DAYS_TR[d.weekday()],
-                    "weekday_short": DAYS_TR_SHORT[d.weekday()],
-                    "predicted": round(pred),
-                    "ratio": round(ratio, 3),
-                    "intensity": intensity,
-                    "status": status,
-                    "tavg": w.get("tavg"),
-                    "condition": w.get("condition"),
-                    "is_selected": i == 0,
-                })
-    except Exception as e:
-        raise HTTPException(503, f"AI servisine ulaşılamadı: {e}")
+    weekly_forecast = []
+    start = datetime.strptime(payload.date, "%Y-%m-%d")
+    for i in range(7):
+        d = start + timedelta(days=i)
+        ds = d.strftime("%Y-%m-%d")
+        w = get_weather_forecast(payload.city, ds)
+        pr = ai_result if i == 0 else ai_predict_local(ds, w)
+        pred = float(pr["predicted_er_patients"])
+        ratio = pred / CAPACITY
+        intensity, status = _classify(ratio)
+        weekly_forecast.append({
+            "date": ds,
+            "date_tr": d.strftime("%d.%m.%Y"),
+            "weekday": DAYS_TR[d.weekday()],
+            "weekday_short": DAYS_TR_SHORT[d.weekday()],
+            "predicted": round(pred),
+            "ratio": round(ratio, 3),
+            "intensity": intensity,
+            "status": status,
+            "tavg": w.get("tavg"),
+            "condition": w.get("condition"),
+            "is_selected": i == 0,
+        })
 
     predicted = float(ai_result["predicted_er_patients"])
     surge_pct = round((predicted - BASELINE_PATIENTS) / BASELINE_PATIENTS * 100, 1)

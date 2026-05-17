@@ -1,58 +1,46 @@
 # YAP-İS — Yapay Zeka Destekli İzin Planlayıcısı
 
-> **Predictive Healthcare Management**
-> Hava durumu + resmi tatil + hastalık trendlerini birleştiren CatBoost modeli, acil servis yoğunluğunu öngörüp doktor izinlerini otonom olarak yeniden planlar.
+> **Predictive Healthcare Management** — Hava durumu + hafta günü + hastalık trendlerini birleştiren AI, acil servis yoğunluğunu öngörüp doktor izinlerini otonom planlar.
 
-## 📁 Repo Yapısı
+## 🚀 Tek Komutla Çalıştırma
 
-```
-.
-├── backend/    FastAPI iş mantığı + REST API (port 8000) ─ frontend'i de servis eder
-│   ├── main.py
-│   ├── routes/        personnel, leave_requests, schedule, ai
-│   └── services/      mock_data, weather
-├── frontend/   YAP-İS dashboard (vanilla HTML/CSS/JS, login + KPI + alert banner)
-├── ai/         CatBoost tahmin mikroservisi (FastAPI, port 9000)
-│   └── predictor.py
-├── data/       Eğitilmiş model, dataset, feature importance
-└── scripts/    run_all.sh • demo_scenario.py • download_model.py
+**Windows:**
+```cmd
+git clone https://github.com/hasbitas/yapay_zeka_destekli_izin_zamanlay-c-_sistemi.git
+cd yapay_zeka_destekli_izin_zamanlay-c-_sistemi
+git checkout claude/integrate-hackathon-modules-JZGjY
+scripts\run_all.bat
 ```
 
-## 🚀 Tek Komutla Demo
-
+**Linux / macOS:**
 ```bash
-python scripts/download_model.py    # (opsiyonel) Drive'dan model+dataset indir
-bash scripts/run_all.sh             # AI(9000) + Backend+Frontend(8000) ayağa kalkar
-# Tarayıcı:  http://127.0.0.1:8000/
-# Login:     AY001 / ayse123   (veya BAŞHEKİM / admin)
+git clone https://github.com/hasbitas/yapay_zeka_destekli_izin_zamanlay-c-_sistemi.git
+cd yapay_zeka_destekli_izin_zamanlay-c-_sistemi
+git checkout claude/integrate-hackathon-modules-JZGjY
+bash scripts/run_all.sh
 ```
 
-## 🎬 Senaryo: Salı -5°C
+→ Tarayıcı otomatik açılır: `http://127.0.0.1:8000/` • Login: `AY001 / ayse123`
 
-1. Frontend "🤖 Predictive Scenario Çalıştır" butonuna basılır.
-2. Backend `services/weather.py` → 2026-05-19 için **-5°C, kar yağışı** verisi alır.
-3. Backend → AI servisinin `POST /predict` endpoint'ine hava verisini gönderir.
-4. CatBoost (`tavg`, `dayofweek`, `snow`, `prcp` ...) **%40+ vaka artışı** öngörür.
-5. Backend iş mantığı: `surge ≥ %20` → o günkü onaylı izinleri **Perşembe'ye** taşır.
-6. Frontend kırmızı **"Hava Durumu Kaynaklı Operasyonel Güncelleme"** banner'ını,
-   güncellenmiş çizelgeyi (kaydırılan satırlar flash highlight) ve KPI'ları yansıtır.
+## 🔧 Gereksinimler (minimum)
 
-## 🔌 Mimari (CTO notu)
+- Python 3.9+ (Windows: kurarken **"Add Python to PATH"** işaretle)
+- İnternet (sadece ilk açılışta `pip install` için)
+
+> Sadece `fastapi`, `uvicorn`, `pydantic` kurulur. CatBoost **opsiyonel**: model dosyası `data/catboost_er_model.cbm` varsa kullanılır, yoksa deterministik heuristic fallback devreye girer ve demo aynı şekilde çalışır.
+
+## 📁 Repo
 
 ```
-┌─────────┐  POST /api/ai/predict-and-reschedule  ┌──────────┐
-│Frontend │ ────────────────────────────────────► │ Backend  │
-│  :8000  │  ◄──── unified JSON payload ────────  │FastAPI   │
-└─────────┘                                       │ :8000    │
-                                                  └─┬──────┬─┘
-                              weather mock ◄────────┘      │
-                                                           ▼
-                                                  ┌──────────────┐
-                                                  │ AI Predictor │
-                                                  │ FastAPI :9000│
-                                                  │ + CatBoost   │
-                                                  └──────────────┘
+backend/   FastAPI (port 8000) — frontend'i de servis eder, AI tahmini in-process
+frontend/  YAP-İS dashboard (vanilla HTML/CSS/JS)
+ai/        Opsiyonel ayrı mikroservis (tek port modunda gerekmez)
+data/      Model + dataset
+scripts/   run_all.bat (Windows) • run_all.sh (Linux/Mac)
 ```
 
-REST/JSON over HTTP. CORS açık. AI servisi `AI_SERVICE_URL` env ile değiştirilebilir.
-Model dosyası yoksa AI servisi `feature_importance.csv` türevli **heuristic fallback**'e düşer — demo asla kırılmaz.
+## 🎬 Senaryo
+
+Dashboard'da tarih seç → **🤖 Yapay Zeka Analizini Başlat** → 7 günlük forecast, kaydırılan izinler, hava durumu uyarısı.
+
+Detaylı sistem mimarisi ve teknoloji yığını için: [RAPOR.md](./RAPOR.md)
