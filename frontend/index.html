@@ -3,18 +3,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>YAP-İS | Yapay Zeka Destekli İzin Planlayıcısı</title>
+  <!-- SEO: Başlık ve Açıklama -->
+  <title>YAP-IS | Yapay Zeka Destekli İzin Planlayıcı</title>
+  <meta name="description" content="Hastaneler için yapay zeka destekli hekim izin planlama ve kaynak yönetimi gösterge paneli." />
+  <!-- Stil Dosyası -->
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-  <!-- LOGIN -->
+  <!-- ============================================
+       GİRİŞ EKRANI (LOGIN)
+       Doktor ID ve şifresiyle giriş yapılır.
+       Giriş başarılı olunca gizlenir, dashboard gösterilir.
+       ============================================ -->
   <div class="login-overlay" id="loginOverlay">
     <div class="login-card">
+      <!-- Logo -->
       <div class="login-logo">
         <h1>YAP-İS</h1>
-        <p>Yapay Zeka Destekli İzin Planlayıcısı</p>
+        <p>Yapay Zeka Destekli İzin Planlayıcı</p>
       </div>
+
+      <!-- Giriş Formu -->
       <form class="login-form" id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group">
           <label for="loginId">👤 Doktor ID</label>
@@ -22,92 +32,182 @@
         </div>
         <div class="form-group">
           <label for="loginPassword">🔒 Şifre</label>
-          <input type="password" id="loginPassword" placeholder="Şifreniz" required />
+          <input type="password" id="loginPassword" placeholder="Şifrenizi girin" required />
         </div>
+        <!-- Hata mesajı alanı -->
         <div class="login-error" id="loginError"></div>
         <button type="submit" class="login-button">Giriş Yap</button>
       </form>
-      <p class="login-hint">Demo: AY001 / ayse123 • başhekim / admin (yönetim paneli)</p>
+
+      <!-- Bilgilendirme notu -->
+      <p class="login-hint">Demo hesaplar için: ID: AY001, Şifre: ayse123</p>
     </div>
   </div>
 
-  <!-- APP -->
+  <!-- ============================================
+       ANA UYGULAMA (Dashboard)
+       Giriş yapılmadan gizli kalır.
+       ============================================ -->
   <div class="app-container" id="appContainer" style="display:none;">
-    <nav class="navbar">
+
+    <!-- ============================================
+         ÜST BAR (NAVBAR)
+         Sol tarafta YAP-İS logosu, sağ tarafta
+         kullanıcı bilgileri ve dark mode butonu.
+         Eski sidebar'ın yerini alır.
+         ============================================ -->
+    <nav class="navbar" id="navbar">
       <div class="navbar-left">
+        <!-- Logo: Eski sidebar'daki logonun üst bar versiyonu -->
         <div class="navbar-logo">
           <h1>YAP-İS</h1>
-          <span>Predictive Healthcare</span>
+          <span>Yapay Zeka Destekli İzin Planlayıcı</span>
         </div>
       </div>
       <div class="navbar-right">
-        <div class="header-badge" id="dateBadge">📅 —</div>
-        <div class="header-badge" style="background:var(--green-bg);color:#065f46;">⚡ Sistem Aktif</div>
-        <button class="dark-mode-toggle" onclick="toggleDarkMode()">🌙</button>
-        <button class="logout-button" onclick="handleLogout()">🚪 Çıkış</button>
+        <!-- Tarih -->
+        <div class="header-badge">📅 16 Mayıs 2026, Cumartesi</div>
+        <!-- Sistem Durumu -->
+        <div class="header-badge" style="background:var(--green-bg);color:#065f46;">● Sistem Aktif</div>
+        <!-- Karanlık Mod Butonu -->
+        <button class="dark-mode-toggle" id="darkModeToggle" onclick="toggleDarkMode()" aria-label="Karanlık Mod">
+          🌙
+        </button>
+        <!-- Çıkış Butonu -->
+        <button class="logout-button" id="logoutBtn" onclick="handleLogout()" aria-label="Çıkış Yap">
+          🚪 Çıkış
+        </button>
       </div>
     </nav>
 
+    <!-- ============================================
+         ANA İÇERİK ALANI
+         Navbar'ın altında kalan tüm dashboard içeriği.
+         ============================================ -->
     <main class="main-content">
+
+      <!-- ---- Hoş Geldin Başlığı ----
+           Giriş yapan doktorun adı dinamik olarak gösterilir -->
       <header class="header">
         <div class="header-left">
+          <!-- #doctorName: JS tarafından giriş yapan doktorun adı yazılır -->
           <h2>Hoş Geldiniz, <span id="doctorName">Doktor</span> 👋</h2>
-          <p>AI; hava durumunu, tatilleri ve hastalık trendlerini birleştirerek yarının yoğunluğunu öngörüyor.</p>
+          <p>Bugün yapay zeka destekli izin planlaması yapabilirsiniz.</p>
         </div>
-        <button class="ai-button-inline" id="aiButton" onclick="runPredictiveScenario()">
-          🤖 Predictive Scenario Çalıştır (Salı -5°C)
-        </button>
+        <!-- Gün Seçici + AI Analiz Butonu -->
+        <div class="day-changer-wrap">
+          <label for="scenarioDate" class="day-changer-label">📆 Senaryo Günü:</label>
+          <input type="date" id="scenarioDate" class="day-changer-input" value="2026-05-19" />
+          <button class="ai-button-inline" id="aiButton" onclick="runAIAnalysis()">
+            🤖 Yapay Zeka Analizini Başlat
+          </button>
+        </div>
       </header>
 
-      <!-- Weather-driven alert banner — initially hidden -->
-      <div class="alert-banner red" id="weatherAlert" style="display:none;">
-        <div class="alert-icon">🌨️</div>
-        <div id="weatherAlertBody"></div>
-      </div>
-
-      <section class="kpi-grid">
+      <!-- ============================================
+           ÖZET KARTLARI (KPI Cards)
+           3 adet yan yana kart: AI tahmini, kapasite, durum
+           ============================================ -->
+      <section class="kpi-grid" aria-label="Özet Kartları">
+        <!-- Kart 1: AI Tahmini -->
         <div class="kpi-card">
           <div class="kpi-icon">🏥</div>
-          <div class="kpi-label">AI Tahmini — Beklenen ER Hastası</div>
-          <div class="kpi-value" id="kpiPatientValue">—</div>
-          <div class="kpi-sub" id="kpiPatientSub">Senaryoyu çalıştırın</div>
+          <div class="kpi-label">AI Tahmini: Beklenen Hasta</div>
+          <div class="kpi-value" id="kpiPatientValue">850</div>
+          <div class="kpi-sub">Günlük tahmini başvuru</div>
         </div>
+        <!-- Kart 2: Kapasite -->
         <div class="kpi-card">
-          <div class="kpi-icon">🌡️</div>
-          <div class="kpi-label">Hava Durumu (Senaryo Günü)</div>
-          <div class="kpi-value" id="kpiWeatherValue">—</div>
-          <div class="kpi-sub" id="kpiWeatherSub">—</div>
+          <div class="kpi-icon">📊</div>
+          <div class="kpi-label">Hastane Günlük Kapasitesi</div>
+          <div class="kpi-value" id="kpiCapacityValue">1000</div>
+          <div class="kpi-sub">Maksimum günlük hasta</div>
         </div>
+        <!-- Kart 3: Sistem Durumu -->
         <div class="kpi-card">
-          <div class="kpi-icon">🚨</div>
-          <div class="kpi-label">Sistem Aksiyonu</div>
-          <div class="kpi-value" id="kpiStatusValue" style="font-size:1.4rem;color:var(--green);">⏳ Beklemede</div>
-          <div class="kpi-sub" id="kpiStatusSub">İzin durumu burada güncellenecek</div>
+          <div class="kpi-icon">🚦</div>
+          <div class="kpi-label">Sistem Durumu</div>
+          <div class="kpi-value" id="kpiStatusValue" style="color:var(--green);font-size:1.5rem;">
+            ✅ Kapasite Uygun
+          </div>
+          <div class="kpi-sub">Trafik ışığı durumu</div>
         </div>
       </section>
 
-      <div class="chart-card">
-        <h3>📈 7 Günlük ER Yoğunluk Tahmini</h3>
-        <div class="chart-bars" id="chartBars"></div>
+      <!-- ============================================
+           UYARI / AKSİYON BANNER'I
+           Trafik ışığı mantığıyla renk değiştirir.
+           ============================================ -->
+      <div class="alert-banner green" id="alertBanner">
+        <div class="alert-icon">🟢</div>
+        <div>
+          <strong>Yeşil Işık:</strong> Yoğunluk düşük seviyede. İlgili gün için izin onayı verilebilir.
+          Kapasite kullanım oranı: <strong>%85</strong>
+        </div>
       </div>
 
+      <!-- ============================================
+           GRAFİK ALANI (Mock Chart)
+           Haftalık hasta beklenti grafiği.
+           Bugünden başlayarak 7 gün gösterilir.
+           ============================================ -->
+      <div class="chart-card">
+        <h3>📈 Haftalık Hasta Beklenti Grafiği</h3>
+        <div class="chart-bars" id="chartBars">
+          <!-- Barlar JavaScript tarafından dinamik oluşturulur -->
+        </div>
+      </div>
+
+      <!-- ============================================
+           KİŞİSEL İZİN ÖNERİLERİ TABLOSU
+           Giriş yapan doktora özel önerilen izin tarihleri.
+           Her doktorun kendine ait önerileri gösterilir.
+           ============================================ -->
       <div class="table-card">
+        <!-- Tablo Başlığı: İzin sayacı ile birlikte -->
         <div class="table-header-row">
-          <h3>📋 Güncel İzin / Nöbet Çizelgesi</h3>
-          <div class="leave-counter" id="scheduleBadge">— kayıt</div>
+          <h3>📋 Size Önerilen İzin Tarihleri</h3>
+          <!-- İzin Sayacı: Haftalık 2 hak, kullanılan/kalan gösterilir -->
+          <div class="leave-counter" id="leaveCounter">
+            🎫 Kullanılan İzin: <strong><span id="leaveUsed">0</span>/2</strong>
+          </div>
         </div>
         <div class="table-wrapper">
           <table>
             <thead>
-              <tr><th>Personel</th><th>Tarih</th><th>Tür</th><th>Durum</th></tr>
+              <tr>
+                <th>Önerilen Tarih</th>
+                <th>Gün</th>
+                <th>Yoğunluk Tahmini</th>
+                <th>Durum</th>
+              </tr>
             </thead>
-            <tbody id="scheduleTableBody"></tbody>
+            <!-- #leaveTableBody: JS tarafından doktora özel verilerle doldurulur -->
+            <tbody id="leaveTableBody">
+            </tbody>
           </table>
         </div>
+
+        <!-- ============================================
+             DOĞRULAMA ÇUBUĞU
+             Seçimler yapıldıktan sonra "Seçimi Doğrula"
+             veya "İptal" ile kesinleştirilir.
+             Seçim yapılmadan gizli kalır.
+             ============================================ -->
+        <div class="confirm-bar" id="confirmBar" style="display:none;">
+          <p class="confirm-text" id="confirmText">Seçimlerinizi kontrol edin ve doğrulayın.</p>
+          <div class="confirm-buttons">
+            <button class="btn-confirm" onclick="confirmSelections()">✓ Seçimi Doğrula</button>
+            <button class="btn-cancel" onclick="cancelSelections()">✕ İptal</button>
+          </div>
+        </div>
       </div>
+
     </main>
   </div>
+  <!-- Uygulama Sonu -->
 
+  <!-- JavaScript -->
   <script src="app.js"></script>
 </body>
 </html>
