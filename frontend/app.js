@@ -435,6 +435,11 @@ async function runAIAnalysis() {
     const predicted = j.ai_prediction.predicted_er_patients;
     updateDashboard(predicted);
     applyScenarioMeta(j);
+    // 7 günlük backend tahminini grafiğe ve izin tablosuna işle
+    if (j.weekly_forecast) {
+      drawForecastChart(j.weekly_forecast);
+      overlayLeaveTableWithForecast(j.weekly_forecast);
+    }
   } catch (e) {
     // Backend yoksa orijinal davranışa düş (sunum yine devam etsin).
     console.warn('Backend ulaşılamadı, fallback:', e);
@@ -571,4 +576,151 @@ function updateChart(basePrediction) {
       });
     });
   });
+}
+
+// ============================================
+// BACKEND FORECAST → GRAFİK
+// 7 günlük gerçek AI tahminini bar grafiğe çevirir.
+// Her gün kendi oranına göre yeşil/sarı/kırmızı.
+// Seçilen gün outline ile vurgulanır.
+// ============================================
+function drawForecastChart(weekly) {
+  const chartContainer = document.getElementById('chartBars');
+  if (!chartContainer || !weekly || !weekly.length) return;
+
+  const capacity = 1000;
+  const maxVal = Math.max(capacity, ...weekly.map(function (d) { return d.predicted; }));
+  let html = '';
+
+  weekly.forEach(function (day) {
+    const heightPct = Math.min(Math.round((day.predicted / maxVal) * 100), 100);
+    let gradient;
+    if (day.status === 'red')        gradient = 'linear-gradient(180deg,#ef4444,#f87171)';
+    else if (day.status === 'yellow') gradient = 'linear-gradient(180deg,#f59e0b,#fbbf24)';
+    else                              gradient = 'linear-gradient(180deg,#10b981,#34d399)';
+    const highlight = day.is_selected
+      ? 'border:2px solid rgba(99,102,241,0.85);box-shadow:0 0 0 3px rgba(99,102,241,0.25);' : '';
+    html +=
+      '<div class="chart-bar-wrapper">' +
+        '<div class="chart-bar" style="height:0%;background:' + gradient + ';' + highlight + '"' +
+            ' title="' + day.date_tr + ' • ' + day.intensity + ' • ' + day.tavg + '°C">' +
+          '<span class="chart-bar-value">' + day.predicted + '</span>' +
+        '</div>' +
+        '<span class="chart-bar-label">' + day.weekday_short +
+          '<br/><span class="chart-bar-date">' + day.date_tr.substring(0, 5) + '</span>' +
+        '</span>' +
+      '</div>';
+  });
+  chartContainer.innerHTML = html;
+
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      const bars = chartContainer.querySelectorAll('.chart-bar');
+      bars.forEach(function (bar, i) {
+        const val = weekly[i].predicted;
+        bar.style.height = Math.min(Math.round((val / maxVal) * 100), 100) + '%';
+      });
+    });
+  });
+}
+
+// ============================================
+// İZİN ÖNERİLERİ TABLOSU — Forecast Overlay
+// Doktorun listesindeki tarihleri forecast içinde arar,
+// yoğunluk badge'ini ve renk durumunu gerçek tahminle değiştirir.
+// ============================================
+const TR_MONTHS = {
+  'ocak':1,'şubat':2,'mart':3,'nisan':4,'mayıs':5,'haziran':6,
+  'temmuz':7,'ağustos':8,'eylül':9,'ekim':10,'kasım':11,'aralık':12
+};
+
+function trDateToIso(s) {
+  // "19 Mayıs 2026" → "2026-05-19"
+  if (!s) return null;
+  const parts = s.toLocaleString ? s.toString().trim().split(/\s+/) : [];
+  if (parts.length !== 3) return null;
+  const day = parseInt(parts[0], 10);
+  const mon = TR_MONTHS[parts[1].toLocaleLowerCase('tr-TR')];
+  const yr  = parseInt(parts[2], 10);
+  if (!day || !mon || !yr) return null;
+  return yr + '-' + String(mon).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+}
+
+// Hangi ISO haftasındayız? (yıl-haftano)
+function isoWeekKey(isoDate) {
+  const d = new Date(isoDate + 'T00:00:00');
+  const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = tmp.getUTCDay() || 7;
+  tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((tmp - yearStart) / 86400000) + 1) / 7);
+  return tmp.getUTCFullYear() + '-W' + String(week).padStart(2, '0');
+}
+
+let lastScenarioWeek = null;
+
+// İzin önerileri tablosunu SİL ve forecast'tan baştan inşa et.
+// Her gün = bir satır; haftalık 2 limit, hafta değişince sıfırlanır.
+function overlayLeaveTableWithForecast(weekly) {
+  if (!weekly || !weekly.length) return;
+  const tbody = document.getElementById('leaveTableBody');
+  if (!tbody) return;
+
+  // Hafta değişimi tespiti → seçimleri ve sayacı sıfırla
+  const wkKey = isoWeekKey(weekly[0].date);
+  if (wkKey !== lastScenarioWeek) {
+    pendingSelections = {};
+    confirmedCount = 0;
+    isConfirmed = false;
+    lastScenarioWeek = wkKey;
+    document.getElementById('confirmBar').style.display = 'none';
+  }
+
+  // currentDoctor.leaveRecommendations'ı forecast ile YENİDEN üret
+  // (gün/intensity/status'un seçilen tarihle uyumlu olması için)
+  if (currentDoctor) {
+    currentDoctor.leaveRecommendations = weekly.map(function (fc) {
+      return {
+        date: fc.date_tr || fc.date,
+        day: fc.weekday,
+        intensity: fc.intensity,
+        status: fc.status,
+        iso: fc.date,
+        predicted: fc.predicted,
+        tavg: fc.tavg,
+      };
+    });
+  }
+
+  // Tabloyu baştan çiz
+  let html = '';
+  weekly.forEach(function (fc, idx) {
+    const badgeClass = fc.status === 'red' ? 'badge-red'
+                     : fc.status === 'yellow' ? 'badge-yellow' : 'badge-green';
+    const selectedMark = fc.is_selected
+      ? ' style="font-weight:700;color:var(--primary-700);"' : '';
+    html +=
+      '<tr data-index="' + idx + '">' +
+        '<td' + selectedMark + '>' + (fc.date_tr || fc.date) +
+          (fc.is_selected ? ' <span style="font-size:0.7rem;color:var(--primary-500);">●</span>' : '') +
+        '</td>' +
+        '<td>' + fc.weekday + '</td>' +
+        '<td><span class="badge ' + badgeClass + '" title="AI: ' +
+          fc.predicted + ' hasta • ' + fc.tavg + '°C">' + fc.intensity + '</span></td>' +
+        '<td><div class="action-buttons">' +
+          '<button class="btn-sm btn-approve" onclick="selectLeave(' + idx + ', \'approve\', this)">✓ Onayla</button>' +
+          '<button class="btn-sm btn-reject" onclick="selectLeave(' + idx + ', \'reject\', this)">✕ Reddet</button>' +
+        '</div></td>' +
+      '</tr>';
+  });
+  tbody.innerHTML = html;
+
+  // Sayaç label'ını güncelle (hafta + kullanım)
+  updateLeaveCounter();
+  const counter = document.getElementById('leaveCounter');
+  if (counter) {
+    counter.innerHTML = '🎫 Bu Hafta (' + wkKey + ') Kullanılan İzin: ' +
+      '<strong><span id="leaveUsed">' + countPendingApprovals() + '</span>/' +
+      WEEKLY_LEAVE_LIMIT + '</strong>';
+  }
 }

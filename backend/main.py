@@ -1,7 +1,12 @@
+import os
+import sys
+
+# backend/ klasörünü import path'ine ekle — script nereden çalıştırılırsa çalışsın
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-import os
 
 from routes import personnel, leave_requests, schedule, ai
 
@@ -38,4 +43,4 @@ if os.path.isdir(FRONTEND_DIR):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
