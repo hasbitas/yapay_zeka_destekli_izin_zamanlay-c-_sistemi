@@ -689,3 +689,25 @@ body.dark .day-changer-input {
   background: #1e293b; color: #e2e8f0; border-color: #334155;
 }
 body.dark .day-changer-label { color: #94a3b8; }
+
+/* Grafik üstü öneri metni + bar altı tarih */
+.chart-hint {
+  font-size: 0.82rem;
+  color: var(--gray-500);
+  margin-top: -8px;
+  margin-bottom: 18px;
+  padding: 10px 14px;
+  background: var(--primary-50);
+  border-left: 3px solid var(--primary-500);
+  border-radius: 6px;
+}
+body.dark .chart-hint {
+  background: rgba(59,141,229,0.08);
+  color: #cbd5e1;
+}
+.chart-bar-date {
+  font-size: 0.65rem;
+  color: var(--gray-400);
+  font-weight: 500;
+}
+body.dark .chart-bar-date { color: #64748b; }

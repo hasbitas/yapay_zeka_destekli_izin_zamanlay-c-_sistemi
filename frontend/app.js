@@ -606,7 +606,9 @@ function drawForecastChart(weekly) {
             ' title="' + day.date_tr + ' • ' + day.intensity + ' • ' + day.tavg + '°C">' +
           '<span class="chart-bar-value">' + day.predicted + '</span>' +
         '</div>' +
-        '<span class="chart-bar-label">' + day.weekday_short + '</span>' +
+        '<span class="chart-bar-label">' + day.weekday_short +
+          '<br/><span class="chart-bar-date">' + day.date_tr.substring(0, 5) + '</span>' +
+        '</span>' +
       '</div>';
   });
   chartContainer.innerHTML = html;
