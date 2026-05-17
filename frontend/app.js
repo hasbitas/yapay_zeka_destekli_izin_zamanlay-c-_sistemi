@@ -435,6 +435,11 @@ async function runAIAnalysis() {
     const predicted = j.ai_prediction.predicted_er_patients;
     updateDashboard(predicted);
     applyScenarioMeta(j);
+    // 7 günlük backend tahminini grafiğe ve izin tablosuna işle
+    if (j.weekly_forecast) {
+      drawForecastChart(j.weekly_forecast);
+      overlayLeaveTableWithForecast(j.weekly_forecast);
+    }
   } catch (e) {
     // Backend yoksa orijinal davranışa düş (sunum yine devam etsin).
     console.warn('Backend ulaşılamadı, fallback:', e);
@@ -570,5 +575,101 @@ function updateChart(basePrediction) {
         bar.style.height = Math.min(Math.round((val / capacity) * 100), 100) + '%';
       });
     });
+  });
+}
+
+// ============================================
+// BACKEND FORECAST → GRAFİK
+// 7 günlük gerçek AI tahminini bar grafiğe çevirir.
+// Her gün kendi oranına göre yeşil/sarı/kırmızı.
+// Seçilen gün outline ile vurgulanır.
+// ============================================
+function drawForecastChart(weekly) {
+  const chartContainer = document.getElementById('chartBars');
+  if (!chartContainer || !weekly || !weekly.length) return;
+
+  const capacity = 1000;
+  const maxVal = Math.max(capacity, ...weekly.map(function (d) { return d.predicted; }));
+  let html = '';
+
+  weekly.forEach(function (day) {
+    const heightPct = Math.min(Math.round((day.predicted / maxVal) * 100), 100);
+    let gradient;
+    if (day.status === 'red')        gradient = 'linear-gradient(180deg,#ef4444,#f87171)';
+    else if (day.status === 'yellow') gradient = 'linear-gradient(180deg,#f59e0b,#fbbf24)';
+    else                              gradient = 'linear-gradient(180deg,#10b981,#34d399)';
+    const highlight = day.is_selected
+      ? 'border:2px solid rgba(99,102,241,0.85);box-shadow:0 0 0 3px rgba(99,102,241,0.25);' : '';
+    html +=
+      '<div class="chart-bar-wrapper">' +
+        '<div class="chart-bar" style="height:0%;background:' + gradient + ';' + highlight + '"' +
+            ' title="' + day.date_tr + ' • ' + day.intensity + ' • ' + day.tavg + '°C">' +
+          '<span class="chart-bar-value">' + day.predicted + '</span>' +
+        '</div>' +
+        '<span class="chart-bar-label">' + day.weekday_short + '</span>' +
+      '</div>';
+  });
+  chartContainer.innerHTML = html;
+
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      const bars = chartContainer.querySelectorAll('.chart-bar');
+      bars.forEach(function (bar, i) {
+        const val = weekly[i].predicted;
+        bar.style.height = Math.min(Math.round((val / maxVal) * 100), 100) + '%';
+      });
+    });
+  });
+}
+
+// ============================================
+// İZİN ÖNERİLERİ TABLOSU — Forecast Overlay
+// Doktorun listesindeki tarihleri forecast içinde arar,
+// yoğunluk badge'ini ve renk durumunu gerçek tahminle değiştirir.
+// ============================================
+const TR_MONTHS = {
+  'ocak':1,'şubat':2,'mart':3,'nisan':4,'mayıs':5,'haziran':6,
+  'temmuz':7,'ağustos':8,'eylül':9,'ekim':10,'kasım':11,'aralık':12
+};
+
+function trDateToIso(s) {
+  // "19 Mayıs 2026" → "2026-05-19"
+  if (!s) return null;
+  const parts = s.toLocaleString ? s.toString().trim().split(/\s+/) : [];
+  if (parts.length !== 3) return null;
+  const day = parseInt(parts[0], 10);
+  const mon = TR_MONTHS[parts[1].toLocaleLowerCase('tr-TR')];
+  const yr  = parseInt(parts[2], 10);
+  if (!day || !mon || !yr) return null;
+  return yr + '-' + String(mon).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+}
+
+function overlayLeaveTableWithForecast(weekly) {
+  if (!currentDoctor) return;
+  const byDate = {};
+  weekly.forEach(function (d) { byDate[d.date] = d; });
+
+  const rows = document.querySelectorAll('#leaveTableBody tr');
+  rows.forEach(function (row) {
+    const idx = row.getAttribute('data-index');
+    if (idx === null) return;
+    const rec = currentDoctor.leaveRecommendations[parseInt(idx, 10)];
+    if (!rec) return;
+    const iso = trDateToIso(rec.date);
+    const fc = iso ? byDate[iso] : null;
+    if (!fc) return;  // forecast aralığı dışında — dokunma
+
+    // 3. hücredeki badge'i güncelle
+    const cells = row.querySelectorAll('td');
+    if (cells.length < 3) return;
+    const badgeClass = fc.status === 'red' ? 'badge-red'
+                     : fc.status === 'yellow' ? 'badge-yellow' : 'badge-green';
+    cells[2].innerHTML = '<span class="badge ' + badgeClass + '" title="AI: ' +
+                         fc.predicted + ' hasta • ' + fc.tavg + '°C">' +
+                         fc.intensity + '</span>';
+
+    // Modeli güncel tut (sonraki render'larda doğru kalsın)
+    rec.intensity = fc.intensity;
+    rec.status = fc.status;
   });
 }
